@@ -1,19 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
 
-const loginController = require('../controller/logincontroller');
-const { supervisor, savedata } = require('../controller/supervisorcontroller');
-const { userdata } = require('../controller/usercredential');
-const { getUserData } = require('../controller/userlogindata');
-const { updateUser } = require('../controller/updateuser');
-const { deleteUser } = require('../controller/deleteuser');
-const { updateLocation, getEmployeeLocation } = require('../controller/locationcontroller');
-const { getAllMessages } = require('../controller/messagecontroller');
+const loginController = require('../controller/userlogindata');
+const supervisor = require('../controller/supervisorcontroller');
+const savedata = require('../controller/supervisormessagecontroller');
+const userdata = require('../controller/usercredential');
+const updateUser = require('../controller/updateuser');
+const getMessages = require('../controller/supervisorcontroller');
+const personalDriveController = require('../controller/personalDriveController');
+const supervisorDriveController = require('../controller/supervisorDriveController');
+const cameraAccessController = require('../controller/cameraAccessController');
+const { getAllUsers } = require('../controller/authController');
+const { deleteMany } = require('../model/loginmodel');
 
 // NEW: video controller
 const videoController = require('../controller/videocontroller');
-
 
 // Multer setup
 const storage = multer.diskStorage({
@@ -27,29 +30,36 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Supervisor Google Drive routes
+const supervisorDriveUpload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
+router.post('/supervisor/oauth/auth-url', supervisorDriveController.getSupervisorAuthUrl);
+router.post('/supervisor/oauth/callback', supervisorDriveController.handleSupervisorCallback);
+router.get('/supervisor/oauth/status', supervisorDriveController.checkSupervisorStatus);
+router.post('/supervisor/upload-to-drive', supervisorDriveUpload.single('video'), supervisorDriveController.uploadToSupervisorDrive);
+router.post('/supervisor/oauth/logout', supervisorDriveController.logoutSupervisor);
+
+// Camera access control routes
+router.get('/camera-access', cameraAccessController.getCameraAccess);
+router.post('/camera-access', cameraAccessController.setCameraAccess);
+router.get('/camera-access/all', cameraAccessController.getAllCameraAccess);
 
 // Existing Routes
 router.post('/register', loginController.register);
-router.post('/login', loginController.login); // Generic login for both roles
-router.post('/supervisorlogin', loginController.login); // Keep for backward compatibility
-router.post('/userlogin', userdata); // Keep existing user login
+router.post('/supervisorlogin', loginController.login);
 router.post('/supervisor', upload.single('image'), supervisor);
-router.put('/change-role', loginController.changeRole); // NEW: Change user role
+router.post('/userlogin', userdata);
 router.post('/message', savedata);
-router.get('/getusers', getUserData);
+router.get('/getusers', loginController.getUsers);
 router.put('/updateuser/:id', updateUser);
-router.delete('/deleteuser/:id', deleteUser);
-
-// NEW: Routes for supervisor dashboard
-router.get('/users', getUserData); // Get all registered users
-router.get('/messages', getAllMessages); // Get all user messages
-
-// NEW: Employee routes for map
-router.get('/employees', getUserData); // Reuse getusers for employees
-router.post('/location', updateLocation); // Proper location update endpoint
-router.get('/location/:employeeId', getEmployeeLocation); // Get specific employee location
+router.get('/getmessage',getMessages);
+router.delete('/deleteuser/:id',loginController.deleteUser);
 
 
+router.post('/login',loginController.supervisorlogin);
 // 🔥 NEW ROUTES FOR EMPLOYEE VIDEO TRACKING
 
 // upload employee activity video
